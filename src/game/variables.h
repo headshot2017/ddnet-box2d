@@ -182,6 +182,13 @@ MACRO_CONFIG_INT(SvRescue, sv_rescue, 0, 0, 1, CFGFLAG_SERVER, "Allow /rescue co
 MACRO_CONFIG_INT(SvRescueDelay, sv_rescue_delay, 1, 0, 1000, CFGFLAG_SERVER, "Number of seconds between two rescues")
 MACRO_CONFIG_INT(SvPractice, sv_practice, 1, 0, 1, CFGFLAG_SERVER, "Enable practice mode for teams. Means you can use /rescue, but in turn your rank doesn't count.")
 
+// Box2D
+MACRO_CONFIG_INT(B2WorldFps, b2_world_fps, 30, 0, 300, CFGFLAG_SERVER, "box2d world fps (not really fps, higher value slows down the world)")
+MACRO_CONFIG_INT(B2TeeJointMaxForce, b2_teejoint_maxforce, 100000, 0, 2147483647, CFGFLAG_SERVER, "maxForce value for the tee's box2d mouse joint")
+MACRO_CONFIG_INT(B2TeeJointDamping, b2_teejoint_damping, 4, 0, 2147483647, CFGFLAG_SERVER, "damping value for the tee's box2d mouse joint")
+MACRO_CONFIG_INT(B2TeeJointStiffness, b2_teejoint_stiffness, 100000, 0, 2147483647, CFGFLAG_SERVER, "stiffness value for the tee's box2d mouse joint")
+MACRO_CONFIG_INT(B2TeeLaser, b2_tee_laser, 0, 0, 1, CFGFLAG_SERVER, "draws your tee in the box2d world as a laser")
+
 MACRO_CONFIG_INT(ClVideoPauseWithDemo, cl_video_pausewithdemo, 1, 0, 1, CFGFLAG_CLIENT | CFGFLAG_SAVE, "Pause video rendering when demo playing pause")
 MACRO_CONFIG_INT(ClVideoShowhud, cl_video_showhud, 0, 0, 1, CFGFLAG_CLIENT | CFGFLAG_SAVE, "Show ingame HUD when rendering video")
 MACRO_CONFIG_INT(ClVideoShowChat, cl_video_showchat, 1, 0, 1, CFGFLAG_CLIENT | CFGFLAG_SAVE, "Show chat when rendering video")

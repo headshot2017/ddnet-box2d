@@ -12,6 +12,8 @@
 
 #include "character.h"
 
+#include <box2d/box2d.h>
+
 CProjectile::CProjectile(
 	CGameWorld *pGameWorld,
 	int Type,
@@ -127,6 +129,15 @@ void CProjectile::Tick()
 	if(m_LifeSpan > -1)
 		m_LifeSpan--;
 
+	BodyCollideQuery queryCallback;
+	b2Vec2 b2Pos(ColPos.x / 30.f, ColPos.y / 30.f);
+	queryCallback.Body = 0;
+	queryCallback.findPos = b2Pos;
+	b2AABB aabb;
+	aabb.lowerBound = b2Vec2(b2Pos.x - 0.001, b2Pos.y - 0.001);
+	aabb.upperBound = b2Vec2(b2Pos.x + 0.001, b2Pos.y + 0.001);
+	GameServer()->m_b2world->QueryAABB(&queryCallback, aabb);
+
 	int64_t TeamMask = -1LL;
 	bool IsWeaponCollide = false;
 	if(
@@ -148,7 +159,7 @@ void CProjectile::Tick()
 		return;
 	}
 
-	if(((pTargetChr && (pOwnerChar ? !(pOwnerChar->m_Hit & CCharacter::DISABLE_HIT_GRENADE) : g_Config.m_SvHit || m_Owner == -1 || pTargetChr == pOwnerChar)) || Collide || GameLayerClipped(CurPos)) && !IsWeaponCollide)
+	if(((pTargetChr && (pOwnerChar ? !(pOwnerChar->m_Hit & CCharacter::DISABLE_HIT_GRENADE) : g_Config.m_SvHit || m_Owner == -1 || pTargetChr == pOwnerChar)) || Collide || GameLayerClipped(CurPos) || queryCallback.Body) && !IsWeaponCollide)
 	{
 		if(m_Explosive /*??*/ && (!pTargetChr || (pTargetChr && (!m_Freeze || (m_Type == WEAPON_SHOTGUN && Collide)))))
 		{

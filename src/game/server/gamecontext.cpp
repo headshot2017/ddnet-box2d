@@ -24,6 +24,7 @@
 #include <game/generated/protocolglue.h>
 
 #include "entities/character.h"
+#include "entities/box2d_box.h"
 #include "gamemodes/DDRace.h"
 #include "player.h"
 #include "score.h"
@@ -63,6 +64,9 @@ void CGameContext::Construct(int Resetting)
 	m_ChatResponseTargetID = -1;
 	m_aDeleteTempfile[0] = 0;
 	m_TeeHistorianActive = false;
+
+	b2Vec2 gravity(0.f, 9.81f);
+	m_b2world = new b2World(gravity);
 }
 
 void CGameContext::Destruct(int Resetting)
@@ -77,6 +81,12 @@ void CGameContext::Destruct(int Resetting)
 	{
 		delete m_pScore;
 		m_pScore = nullptr;
+	}
+
+	if (m_b2world)
+	{
+		delete m_b2world;
+		m_b2world = NULL;
 	}
 }
 
@@ -229,6 +239,7 @@ void CGameContext::CreateExplosion(vec2 Pos, int Owner, int Weapon, bool NoDamag
 	float InnerRadius = 48.0f;
 	int Num = m_World.FindEntities(Pos, Radius, (CEntity **)apEnts, MAX_CLIENTS, CGameWorld::ENTTYPE_CHARACTER);
 	int64_t TeamMask = -1;
+	float Strength;
 	for(int i = 0; i < Num; i++)
 	{
 		vec2 Diff = apEnts[i]->m_Pos - Pos;
@@ -237,7 +248,6 @@ void CGameContext::CreateExplosion(vec2 Pos, int Owner, int Weapon, bool NoDamag
 		if(l)
 			ForceDir = normalize(Diff);
 		l = 1 - clamp((l - InnerRadius) / (Radius - InnerRadius), 0.0f, 1.0f);
-		float Strength;
 		if(Owner == -1 || !m_apPlayers[Owner] || !m_apPlayers[Owner]->m_TuneZone)
 			Strength = Tuning()->m_ExplosionStrength;
 		else
@@ -265,6 +275,42 @@ void CGameContext::CreateExplosion(vec2 Pos, int Owner, int Weapon, bool NoDamag
 
 			apEnts[i]->TakeDamage(ForceDir * Dmg * 2, (int)Dmg, Owner, Weapon);
 		}
+	}
+
+	// apply force to box2d objects
+	b2Vec2 b2Pos(Pos.x / 30.f, Pos.y / 30.f);
+	b2Vec2 b2Rad((Radius) / 30.f, (Radius) / 30.f);
+	Strength = Tuning()->m_ExplosionStrength;
+
+	int numRays = 32;
+	for (int i=0; i<numRays; i++)
+	{
+		float angle = ((i / (float)numRays) * 360) / 180.f * b2_pi;
+		b2Vec2 rayDir(sinf(angle), cosf(angle));
+
+		// use a "particle" system, essentially very tiny circles, that hits objects at high speeds
+		b2BodyDef bd;
+		bd.type = b2_dynamicBody;
+		bd.fixedRotation = true; // don't rotate
+		bd.bullet = true; // avoid tunneling at high speed
+		bd.linearDamping = 10; // slow down
+		bd.gravityScale = 0; // don't be affected by gravity
+		bd.position = b2Pos;
+		bd.linearVelocity = (Strength * 30.f) * rayDir;
+		b2Body* body = m_b2world->CreateBody(&bd);
+
+		b2CircleShape circle;
+		circle.m_radius = 0.05; // ok so basically i'm very... you get the drill
+
+		b2FixtureDef fd;
+		fd.shape = &circle;
+		fd.density = 60 / (float)numRays;
+		fd.friction = 0;
+		fd.restitution = 0.99f;
+		fd.filter.groupIndex = -1;
+		body->CreateFixture(&fd);
+
+		m_b2explosions.push_back(body);
 	}
 }
 
@@ -1059,6 +1105,20 @@ void CGameContext::OnTick()
 				m_LastMapVote = 0;
 		}
 		m_SqlRandomMapResult = nullptr;
+	}
+
+	if (m_b2world)
+	{
+		m_b2world->Step(1. / g_Config.m_B2WorldFps, 8, 3);
+		for (unsigned i=0; i<m_b2explosions.size(); i++)
+		{
+			if (m_b2explosions[i]->GetLinearVelocity().x < 5.f and m_b2explosions[i]->GetLinearVelocity().y < 5.f) // delete
+			{
+				m_b2world->DestroyBody(m_b2explosions[i]);
+				m_b2explosions.erase(m_b2explosions.begin() + i);
+				--i;
+			}
+		}
 	}
 
 #ifdef CONF_DEBUG
@@ -3012,6 +3072,46 @@ void CGameContext::ConVote(IConsole::IResult *pResult, void *pUserData)
 		pSelf->ForceVote(pResult->m_ClientID, false);
 }
 
+void CGameContext::ConB2CreateBox(IConsole::IResult *pResult, void *pUserData)
+{
+	CGameContext *pSelf = (CGameContext *)pUserData;
+
+	CCharacter *Char = pSelf->GetPlayerChar(pResult->m_ClientID);
+	if (not Char) return;
+
+	vec2 size(pResult->GetInteger(0), pResult->GetInteger(1));
+	pSelf->m_b2bodies.push_back(new CBox2DBox(&pSelf->m_World, vec2(Char->m_Pos.x, Char->m_Pos.y-128), size, 0, pSelf->m_b2world, b2_dynamicBody, 1.f));
+	pSelf->Console()->Print(IConsole::OUTPUT_LEVEL_STANDARD, "Box2D", "Created box above you");
+}
+
+void CGameContext::ConB2CreateGround(IConsole::IResult *pResult, void *pUserData)
+{
+	CGameContext *pSelf = (CGameContext *)pUserData;
+
+	CCharacter *Char = pSelf->GetPlayerChar(pResult->m_ClientID);
+	if (not Char) return;
+
+	vec2 size(pResult->GetInteger(0), pResult->GetInteger(1));
+	float angle = ((pResult->NumArguments() >= 2) ? pResult->GetInteger(2) : 0) / 180 * b2_pi;
+	pSelf->m_b2bodies.push_back(new CBox2DBox(&pSelf->m_World, vec2(Char->m_Pos.x, Char->m_Pos.y+28), size, angle, pSelf->m_b2world, b2_kinematicBody, 0.f));
+
+	pSelf->Console()->Print(IConsole::OUTPUT_LEVEL_STANDARD, "Box2D", "Created ground");
+}
+
+void CGameContext::ConB2ClearWorld(IConsole::IResult *pResult, void *pUserData)
+{
+	CGameContext *pSelf = (CGameContext *)pUserData;
+
+	for (unsigned i=0; i<pSelf->m_b2bodies.size(); i++)
+	{
+		if (pSelf->m_b2bodies[i])
+			delete pSelf->m_b2bodies[i];
+	}
+	pSelf->m_b2bodies.clear();
+
+	pSelf->Console()->Print(IConsole::OUTPUT_LEVEL_STANDARD, "Box2D", "Cleared world");
+}
+
 void CGameContext::ConchainSpecialMotdupdate(IConsole::IResult *pResult, void *pUserData, IConsole::FCommandCallback pfnCallback, void *pCallbackUserData)
 {
 	pfnCallback(pResult, pCallbackUserData);
@@ -3060,6 +3160,10 @@ void CGameContext::OnConsoleInit()
 	Console()->Register("add_map_votes", "", CFGFLAG_SERVER, ConAddMapVotes, this, "Automatically adds voting options for all maps");
 	Console()->Register("vote", "r['yes'|'no']", CFGFLAG_SERVER, ConVote, this, "Force a vote to yes/no");
 	Console()->Register("dump_antibot", "", CFGFLAG_SERVER, ConDumpAntibot, this, "Dumps the antibot status");
+
+	Console()->Register("b2_create_box", "i[width] i[height]", CFGFLAG_SERVER, ConB2CreateBox, this, "create a box in the Box2D world using your current position");
+	Console()->Register("b2_create_ground", "i[width] i[height] ?i[angle OPTIONAL]", CFGFLAG_SERVER, ConB2CreateGround, this, "create ground in the Box2D world using your current position");
+	Console()->Register("b2_clear_world", "", CFGFLAG_SERVER, ConB2ClearWorld, this, "clear all bodies (except tee bodies) in the Box2D world");
 
 	Console()->Chain("sv_motd", ConchainSpecialMotdupdate, this);
 

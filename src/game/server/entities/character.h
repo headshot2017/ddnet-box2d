@@ -3,6 +3,8 @@
 #ifndef GAME_SERVER_ENTITIES_CHARACTER_H
 #define GAME_SERVER_ENTITIES_CHARACTER_H
 
+#include <box2d/box2d.h>
+
 #include <engine/antibot.h>
 #include <game/server/entity.h>
 #include <game/server/save.h>
@@ -268,6 +270,12 @@ public:
 	bool HasTelegunGun() { return m_Core.m_HasTelegunGun; };
 	bool HasTelegunGrenade() { return m_Core.m_HasTelegunGrenade; };
 	bool HasTelegunLaser() { return m_Core.m_HasTelegunLaser; };
+
+	b2Body* m_b2Body;
+	b2Body* m_DummyBody;
+	b2MouseJoint* m_TeeJoint;
+	vec2 m_b2HammerJointDir;
+	int m_b2HammerTick, m_b2HammerTickAdd;
 };
 
 enum

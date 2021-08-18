@@ -1,3 +1,6 @@
 [submodule "ddnet-libs"]
 	path = ddnet-libs
 	url = https://github.com/ddnet/ddnet-libs
+[submodule "box2d"]
+	path = box2d
+	url = http://github.com/erincatto/box2d

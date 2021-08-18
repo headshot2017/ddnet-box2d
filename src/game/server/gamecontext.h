@@ -3,6 +3,9 @@
 #ifndef GAME_SERVER_GAMECONTEXT_H
 #define GAME_SERVER_GAMECONTEXT_H
 
+#include <box2d/box2d.h>
+//#include "entities/box2d_box.h"
+
 #include <engine/antibot.h>
 #include <engine/console.h>
 #include <engine/server.h>
@@ -58,6 +61,46 @@ class IEngine;
 class IStorage;
 struct CAntibotData;
 struct CScoreRandomMapResult;
+class CBox2DBox;
+
+class BodyRangeRay : public b2RayCastCallback
+{
+public:
+	b2Body* m_body;
+	b2Vec2 m_point;
+	b2Vec2 m_normal;
+	float m_fraction;
+
+	float ReportFixture(b2Fixture* fixture, const b2Vec2& point, const b2Vec2& normal, float fraction)
+	{
+		m_body = fixture->GetBody();
+		m_point = point;
+		m_normal = normal;
+		m_fraction = fraction;
+		return 0;
+	}
+};
+
+class BodyCollideQuery : public b2QueryCallback
+{
+public:
+	b2Body* Body;
+	b2Vec2 findPos;
+
+	bool ReportFixture(b2Fixture* fixture)
+	{
+		b2Shape* shape = fixture->GetShape();
+		bool inside = shape->TestPoint(fixture->GetBody()->GetTransform(), findPos);
+
+		if (inside)
+		{
+			Body = fixture->GetBody();
+			return false;
+		}
+		return true;
+	}
+};
+
 
 class CGameContext : public IGameServer
 {
@@ -292,6 +335,10 @@ public:
 
 	std::shared_ptr<CScoreRandomMapResult> m_SqlRandomMapResult;
 
+	b2World* m_b2world;
+	std::vector<CBox2DBox*> m_b2bodies;
+	std::vector<b2Body*> m_b2explosions;
+
 private:
 	bool m_VoteWillPass;
 	class CScore *m_pScore;
@@ -384,6 +431,10 @@ private:
 	static void ConSetTimerType(IConsole::IResult *pResult, void *pUserData);
 	static void ConRescue(IConsole::IResult *pResult, void *pUserData);
 	static void ConProtectedKill(IConsole::IResult *pResult, void *pUserData);
+
+	static void ConB2CreateBox(IConsole::IResult *pResult, void *pUserData);
+	static void ConB2CreateGround(IConsole::IResult *pResult, void *pUserData);
+	static void ConB2ClearWorld(IConsole::IResult *pResult, void *pUserData);
 
 	static void ConVoteMute(IConsole::IResult *pResult, void *pUserData);
 	static void ConVoteUnmute(IConsole::IResult *pResult, void *pUserData);

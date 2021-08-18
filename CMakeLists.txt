@@ -565,6 +565,8 @@ else()
   endif()
 endif()
 
+add_subdirectory(box2d)
+
 ########################################################################
 # DOWNLOAD GTEST
 ########################################################################
@@ -2021,6 +2023,8 @@ set_src(GAME_SERVER GLOB_RECURSE src/game/server
   alloc.h
   ddracechat.cpp
   ddracecommands.cpp
+  entities/box2d_box.cpp
+  entities/box2d_box.h
   entities/character.cpp
   entities/character.h
   entities/door.cpp
@@ -2106,6 +2110,7 @@ add_executable(${TARGET_SERVER}
   $<TARGET_OBJECTS:game-shared>
 )
 target_link_libraries(${TARGET_SERVER} ${LIBS_SERVER})
+target_link_libraries(${TARGET_SERVER} box2d)
 list(APPEND TARGETS_OWN ${TARGET_SERVER})
 list(APPEND TARGETS_LINK ${TARGET_SERVER})
 
