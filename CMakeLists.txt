@@ -1179,6 +1179,7 @@ set(EXPECTED_DATA
   mapres/winter_mountains3.png
   maps/Gold\ Mine.map
   maps/LearnToPlay.map
+  maps/nouis.map
   maps/Sunny\ Side\ Up.map
   maps/Tsunami.map
   maps/ctf1.map
